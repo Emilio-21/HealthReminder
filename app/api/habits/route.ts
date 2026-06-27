@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 import { randomBytes } from 'crypto'
 
@@ -36,5 +37,7 @@ export async function POST(req: NextRequest) {
 
   if (schedErr) return NextResponse.json({ error: schedErr.message }, { status: 500 })
 
+  revalidatePath('/')
+  revalidatePath('/history')
   return NextResponse.json(habit, { status: 201 })
 }
