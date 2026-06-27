@@ -1,64 +1,44 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
 
-type DayStatus = 'done' | 'missed' | 'partial' | 'empty'
+const PALETTE = [
+  { accent: '#2dd4bf', glow: 'rgba(45,212,191,0.35)', chipBg: 'rgba(45,212,191,0.12)' },
+  { accent: '#fbbf24', glow: 'rgba(251,191,36,0.35)',  chipBg: 'rgba(251,191,36,0.12)' },
+  { accent: '#fdba74', glow: 'rgba(253,186,116,0.32)', chipBg: 'rgba(253,186,116,0.12)' },
+]
 
-type HabitHistory = {
-  id: string
-  name: string
-  emoji: string
-  streak: number
-  compliance: number | null
-  days: { date: string; status: DayStatus }[]
-}
+type DayCell = { color: string }
 
-async function getHistory(): Promise<HabitHistory[]> {
+async function getHistory() {
   const { data: habits } = await supabaseAdmin
-    .from('habits')
-    .select('id, name, emoji')
-    .eq('active', true)
-    .order('created_at')
-
+    .from('habits').select('id, name, emoji').eq('active', true).order('created_at')
   if (!habits) return []
 
-  // Last 30 days
-  const today = new Date(); today.setHours(23, 59, 59, 999)
-  const from = new Date(today); from.setDate(from.getDate() - 29); from.setHours(0, 0, 0, 0)
+  const today = new Date(); today.setHours(23,59,59,999)
+  const from = new Date(today); from.setDate(from.getDate()-29); from.setHours(0,0,0,0)
 
   const dateList: string[] = []
   const cur = new Date(from)
-  while (cur <= today) {
-    dateList.push(cur.toISOString().slice(0, 10))
-    cur.setDate(cur.getDate() + 1)
-  }
+  while (cur <= today) { dateList.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1) }
 
-  return Promise.all(habits.map(async h => {
+  return Promise.all(habits.map(async (h, idx) => {
     const { data: reminders } = await supabaseAdmin
-      .from('reminders')
-      .select('scheduled_for, status')
-      .eq('habit_id', h.id)
-      .gte('scheduled_for', from.toISOString())
-      .lte('scheduled_for', today.toISOString())
-      .order('scheduled_for')
+      .from('reminders').select('scheduled_for, status')
+      .eq('habit_id', h.id).gte('scheduled_for', from.toISOString()).lte('scheduled_for', today.toISOString())
 
     const byDate = new Map<string, string[]>()
     for (const r of reminders ?? []) {
-      const d = r.scheduled_for.slice(0, 10)
+      const d = r.scheduled_for.slice(0,10)
       if (!byDate.has(d)) byDate.set(d, [])
       byDate.get(d)!.push(r.status)
     }
 
-    const days = dateList.map(date => {
-      const statuses = byDate.get(date) ?? []
-      let status: DayStatus = 'empty'
-      if (statuses.length > 0) {
-        const terminal = statuses.filter(s => s !== 'pending')
-        if (terminal.length === 0) status = 'empty'
-        else if (terminal.every(s => s === 'done')) status = 'done'
-        else if (terminal.every(s => s === 'missed')) status = 'missed'
-        else status = 'partial'
-      }
-      return { date, status }
+    const cells: DayCell[] = dateList.map(date => {
+      const s = (byDate.get(date) ?? []).filter(x => x !== 'pending')
+      if (!s.length) return { color: '#1b2538' }
+      if (s.every(x => x === 'done')) return { color: PALETTE[idx % PALETTE.length].accent }
+      if (s.every(x => x === 'missed')) return { color: '#b45b5b' }
+      return { color: '#fbbf24' }
     })
 
     const terminal = (reminders ?? []).filter(r => r.status !== 'pending')
@@ -66,108 +46,94 @@ async function getHistory(): Promise<HabitHistory[]> {
     const compliance = terminal.length > 0 ? Math.round((done / terminal.length) * 100) : null
 
     // Streak
-    const todayStr = new Date().toISOString().slice(0, 10)
+    const check = new Date(); check.setDate(check.getDate()-1)
     let streak = 0
-    const check = new Date(); check.setDate(check.getDate() - 1)
-    for (let i = 0; i < 60; i++) {
-      const d = check.toISOString().slice(0, 10)
-      const s = byDate.get(d)
-      if (!s || !s.filter(x => x !== 'pending').every(x => x === 'done') || s.filter(x => x !== 'pending').length === 0) break
-      streak++
-      check.setDate(check.getDate() - 1)
+    for (let i=0;i<60;i++) {
+      const d = check.toISOString().slice(0,10)
+      const s = (byDate.get(d) ?? []).filter(x => x !== 'pending')
+      if (!s.length || !s.every(x => x === 'done')) break
+      streak++; check.setDate(check.getDate()-1)
     }
-    // Include today if all done
-    const todayS = byDate.get(todayStr)
-    if (todayS && todayS.filter(x => x !== 'pending').length > 0 && todayS.filter(x => x !== 'pending').every(x => x === 'done')) {
-      streak++
-    }
+    const todayS = (byDate.get(new Date().toISOString().slice(0,10)) ?? []).filter(x => x !== 'pending')
+    if (todayS.length && todayS.every(x => x === 'done')) streak++
 
-    return { ...h, streak, compliance, days }
+    return { ...h, cells, compliance, streak, colorIdx: idx % PALETTE.length }
   }))
-}
-
-function dayColor(status: DayStatus) {
-  if (status === 'done') return 'bg-teal-500'
-  if (status === 'missed') return 'bg-red-700/70'
-  if (status === 'partial') return 'bg-amber-600/70'
-  return 'bg-slate-800'
-}
-
-function shortDay(dateStr: string) {
-  const d = new Date(dateStr + 'T12:00:00')
-  return d.getDate()
-}
-
-function isToday(dateStr: string) {
-  return dateStr === new Date().toISOString().slice(0, 10)
 }
 
 export default async function HistoryPage() {
   const habits = await getHistory()
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="max-w-lg mx-auto px-5 pt-10 pb-16">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <Link href="/" className="text-slate-500 hover:text-white transition-colors text-lg">←</Link>
-          <h1 className="text-2xl font-bold tracking-tight">Historial</h1>
+    <main style={{ minHeight:'100vh', background:'#070b13', color:'#f1f5f9' }}>
+      <div style={{ maxWidth:448, margin:'0 auto', padding:'40px 20px 24px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:28 }}>
+          <Link href="/" style={{ width:34, height:34, borderRadius:11, background:'#0d1320', border:'1px solid #1b2538', display:'flex', alignItems:'center', justifyContent:'center', color:'#5a6b85', textDecoration:'none' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </Link>
+          <div>
+            <p style={{ font:'500 12px Geist,sans-serif', color:'#64748b', letterSpacing:'.1em', textTransform:'uppercase' }}>Últimos 30 días</p>
+            <h1 style={{ font:'700 32px Geist,sans-serif', color:'#f1f5f9', marginTop:4, letterSpacing:'-.02em' }}>Historial</h1>
+          </div>
         </div>
 
-        <div className="space-y-8">
-          {habits.map(h => (
-            <div key={h.id}>
-              {/* Habit header */}
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">{h.emoji}</span>
-                <div className="flex-1">
-                  <h2 className="font-semibold">{h.name}</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Últimos 30 días</p>
-                </div>
-                <div className="flex gap-4 text-right">
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          {habits.map(h => {
+            const pal = PALETTE[h.colorIdx]
+            return (
+              <div key={h.id} style={{ borderRadius:26, background:'#0d1320', border:'1px solid #1b2538', padding:'18px 18px 16px' }}>
+                {/* Header */}
+                <div style={{ display:'flex', alignItems:'center', gap:11, marginBottom:16 }}>
+                  <div style={{ width:40, height:40, borderRadius:13, background:pal.chipBg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
+                    {h.emoji}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ font:'600 16px Geist,sans-serif', color:'#f1f5f9' }}>{h.name}</div>
+                    {h.streak > 0 && (
+                      <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:3 }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={pal.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+                        <span style={{ font:'600 12px Geist,sans-serif', color:pal.accent }}>{h.streak} días de racha</span>
+                      </div>
+                    )}
+                  </div>
                   {h.compliance !== null && (
-                    <div>
-                      <p className="text-lg font-bold text-teal-400">{h.compliance}%</p>
-                      <p className="text-xs text-slate-500">cumpl.</p>
-                    </div>
-                  )}
-                  {h.streak > 0 && (
-                    <div>
-                      <p className="text-lg font-bold text-amber-400">{h.streak}</p>
-                      <p className="text-xs text-slate-500">racha</p>
+                    <div style={{ textAlign:'right', flexShrink:0 }}>
+                      <div style={{ font:'700 22px Geist,sans-serif', color:'#f1f5f9', letterSpacing:'-.02em' }}>{h.compliance}%</div>
+                      <div style={{ font:'500 11px Geist,sans-serif', color:'#5a6b85' }}>cumplido</div>
                     </div>
                   )}
                 </div>
-              </div>
 
-              {/* Heatmap grid — 5 rows × 6 cols = 30 days */}
-              <div className="grid grid-cols-[repeat(30,1fr)] gap-1">
-                {h.days.map(({ date, status }) => (
-                  <div
-                    key={date}
-                    title={date}
-                    className={`aspect-square rounded-sm ${dayColor(status)} ${isToday(date) ? 'ring-2 ring-white/40' : ''}`}
-                  />
-                ))}
-              </div>
+                {/* Heatmap */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(30,1fr)', gap:2 }}>
+                  {h.cells.map((c, i) => (
+                    <div key={i} style={{ width:'100%', aspectRatio:'1', borderRadius:2, background:c.color }} />
+                  ))}
+                </div>
 
-              {/* Month labels */}
-              <div className="flex justify-between mt-1.5">
-                <span className="text-xs text-slate-600">
-                  {new Date(h.days[0].date + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
-                </span>
-                <span className="text-xs text-slate-600">hoy</span>
+                {/* Date labels */}
+                <div style={{ display:'flex', justifyContent:'space-between', marginTop:6 }}>
+                  <span style={{ font:'500 10px Geist,sans-serif', color:'#334155' }}>hace 30 días</span>
+                  <span style={{ font:'500 10px Geist,sans-serif', color:'#334155' }}>hoy</span>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Legend */}
-        <div className="mt-10 flex gap-4 text-xs text-slate-500">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-teal-500 inline-block" /> Hecho</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-600/70 inline-block" /> Parcial</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-700/70 inline-block" /> Fallado</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-slate-800 inline-block" /> Sin datos</span>
+        <div style={{ display:'flex', gap:16, flexWrap:'wrap', marginTop:24, padding:'0 4px' }}>
+          {[
+            { c:'#2dd4bf', l:'Hecho' },
+            { c:'#fbbf24', l:'Parcial' },
+            { c:'#b45b5b', l:'Fallado' },
+            { c:'#1b2538', l:'Vacío' },
+          ].map(g => (
+            <div key={g.l} style={{ display:'flex', alignItems:'center', gap:7 }}>
+              <div style={{ width:12, height:12, borderRadius:3, background:g.c }} />
+              <span style={{ font:'500 12px Geist,sans-serif', color:'#7c8aa3' }}>{g.l}</span>
+            </div>
+          ))}
         </div>
       </div>
     </main>
