@@ -24,7 +24,7 @@ const links = [
 
 export default function BottomNav() {
   const path = usePathname()
-  if (path.startsWith('/done')) return null
+  if (path.startsWith('/done') || path.startsWith('/scan')) return null
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center px-5 pointer-events-none" style={{paddingBottom:'calc(16px + env(safe-area-inset-bottom))', transform:'translateZ(0)', WebkitTransform:'translateZ(0)'}}>

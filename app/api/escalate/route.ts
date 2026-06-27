@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendMessage, nagMessage, missMessage } from '@/lib/telegram'
+import { sendMessage, nagMessage, missMessage, scanButton } from '@/lib/telegram'
 
 // This is the Next.js equivalent of the edge function.
 // pg_cron will call this (or the Supabase edge function) every minute.
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
         .from('reminders')
         .update({ nag_count: newCount, last_nagged_at: now.toISOString() })
         .eq('id', r.id)
-      await sendMessage(cfg.telegram_chat_id, nagMessage(habit.name, habit.emoji, newCount))
+      await sendMessage(cfg.telegram_chat_id, nagMessage(habit.name, habit.emoji, newCount), scanButton)
       results.push({ id: r.id, action: 'nagged', nag_count: newCount })
     }
   }
