@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { markDone } from '@/lib/habits'
+import { supabaseAdmin } from '@/lib/supabase'
+import { sendMessage, doneMessage } from '@/lib/telegram'
 
 // Called by the Telegram Mini App (/scan) after the native QR scanner returns.
 // Body: { token } — the qr_token embedded in the scanned code (we accept either
@@ -20,5 +22,15 @@ export async function POST(req: NextRequest) {
 
   revalidatePath('/')
   revalidatePath('/history')
+
+  // Confirm in the Telegram chat too (only when we actually marked something today).
+  if (result.marked) {
+    const { data: cfg } = await supabaseAdmin
+      .from('config').select('telegram_chat_id').eq('id', 1).single()
+    if (cfg?.telegram_chat_id) {
+      await sendMessage(cfg.telegram_chat_id, doneMessage(result.habit.name, result.habit.emoji, result.streak))
+    }
+  }
+
   return NextResponse.json(result)
 }

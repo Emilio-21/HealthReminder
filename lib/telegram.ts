@@ -39,6 +39,12 @@ export function nagMessage(habitName: string, emoji: string, n: number): string 
   return `Llevas ${n} avisos ignorados hoy (${habitName}). No me hagas esto. Escanea ya. 😤`
 }
 
+export function doneMessage(habitName: string, emoji: string, streak: number): string {
+  const base = `${emoji} ¡Bien hecho! <b>${habitName}</b> registrado. ✅`
+  if (streak > 1) return `${base}\n🔥 Racha de ${streak} días. ¡Sigue así!`
+  return base
+}
+
 export function missMessage(habitName: string, emoji: string): string {
   return `${emoji} Se acabó el tiempo para <b>${habitName}</b>. Marcado como fallado por hoy. 😞`
 }
