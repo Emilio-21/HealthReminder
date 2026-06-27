@@ -27,7 +27,7 @@ export default function BottomNav() {
   if (path.startsWith('/done')) return null
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center px-5 pointer-events-none" style={{paddingBottom:'calc(16px + env(safe-area-inset-bottom))'}}>
+    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center px-5 pointer-events-none" style={{paddingBottom:'calc(16px + env(safe-area-inset-bottom))', transform:'translateZ(0)', WebkitTransform:'translateZ(0)'}}>
       <nav
         className="pointer-events-auto flex items-center w-full max-w-sm"
         style={{
@@ -37,6 +37,8 @@ export default function BottomNav() {
           WebkitBackdropFilter: 'blur(16px)',
           border: '1px solid #1b2538',
           borderRadius: 30,
+          transform: 'translateZ(0)',
+          WebkitTransform: 'translateZ(0)',
         }}
       >
         {links.map(l => {

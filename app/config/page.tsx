@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 
 type Schedule = {
   id: string
@@ -269,10 +269,12 @@ export default function ConfigPage() {
 
   // passphrase removed — open access
 
-  async function load() {
+  const load = useCallback(async () => {
     const r = await fetch('/api/habits')
     setHabits(await r.json())
-  }
+  }, [])
+
+  useEffect(() => { load() }, [load])
 
   async function save(data: { name:string; emoji:string; schedule: object }) {
     if (editingId) {
