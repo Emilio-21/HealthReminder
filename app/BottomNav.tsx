@@ -27,7 +27,7 @@ export default function BottomNav() {
   if (path.startsWith('/done')) return null
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-5 px-5 pointer-events-none">
+    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center px-5 pointer-events-none" style={{paddingBottom:'calc(16px + env(safe-area-inset-bottom))'}}>
       <nav
         className="pointer-events-auto flex items-center w-full max-w-sm"
         style={{

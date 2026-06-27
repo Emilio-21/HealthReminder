@@ -16,7 +16,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "HealthReminder",
   description: "Tu nagger personal de hábitos",
-};
+}
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
 
 export default function RootLayout({
   children,
@@ -28,7 +34,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col pb-24" style={{background:'#070b13'}}>
+      <body className="min-h-full flex flex-col" style={{background:'#070b13', paddingBottom:'calc(96px + env(safe-area-inset-bottom))'}}>
         {children}
         <BottomNav />
       </body>

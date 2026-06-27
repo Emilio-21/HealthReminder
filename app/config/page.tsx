@@ -260,18 +260,14 @@ function HabitRow({ habit, pal, onEdit, onDelete }: { habit: Habit; pal: typeof 
 }
 
 export default function ConfigPage() {
-  const [unlocked, setUnlocked] = useState(false)
-  const [pass, setPass] = useState('')
-  const [passErr, setPassErr] = useState('')
+  const [unlocked] = useState(true)
+  const [pass] = useState('')
+  const [passErr] = useState('')
   const [habits, setHabits] = useState<Habit[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showNew, setShowNew] = useState(false)
 
-  async function unlock() {
-    const res = await fetch('/api/config/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ passphrase:pass }) })
-    if (res.ok) { setUnlocked(true); load() }
-    else setPassErr('Contraseña incorrecta')
-  }
+  // passphrase removed — open access
 
   async function load() {
     const r = await fetch('/api/habits')
@@ -295,31 +291,14 @@ export default function ConfigPage() {
     load()
   }
 
-  if (!unlocked) return (
-    <main style={{ minHeight:'100vh', background:'#070b13', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-      <div style={{ maxWidth:360, width:'100%' }}>
-        <h1 style={{ font:'700 32px Geist,sans-serif', color:'#f1f5f9', marginBottom:24, letterSpacing:'-.02em' }}>Ajustes</h1>
-        <input type="password" placeholder="Contraseña" value={pass}
-          onChange={e => setPass(e.target.value)} onKeyDown={e => e.key==='Enter' && unlock()}
-          style={{ width:'100%', background:'#0d1320', border:'1px solid #1b2538', borderRadius:14, padding:'14px 16px', font:'600 15px Geist,sans-serif', color:'#e2e8f0', outline:'none', marginBottom:8 }}
-        />
-        {passErr && <p style={{ font:'500 13px Geist,sans-serif', color:'#cf8a8a', marginBottom:10 }}>{passErr}</p>}
-        <button onClick={unlock} style={{ width:'100%', padding:'15px 0', borderRadius:16, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#2dd4bf,#22d3ee)', color:'#04221a', font:'700 15px Geist,sans-serif', boxShadow:'0 10px 26px rgba(45,212,191,.3)' }}>
-          Entrar
-        </button>
-      </div>
-    </main>
-  )
+  void pass; void passErr; void unlocked
 
   return (
     <main style={{ minHeight:'100vh', background:'#070b13', color:'#f1f5f9' }}>
       <div style={{ maxWidth:448, margin:'0 auto', padding:'40px 20px 32px' }}>
         {/* Header */}
         <h1 style={{ font:'700 32px Geist,sans-serif', color:'#f1f5f9', letterSpacing:'-.02em' }}>Ajustes</h1>
-        <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:7, marginBottom:20 }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-          <span style={{ font:'500 12px Geist,sans-serif', color:'#5a6b85' }}>Sesión desbloqueada</span>
-        </div>
+        <div style={{ marginBottom:20 }} />
 
         {/* New habit button */}
         <button onClick={() => { setShowNew(true); setEditingId(null) }} style={{
