@@ -111,15 +111,9 @@ export default async function Home() {
     <main className="min-h-screen bg-slate-950 text-white">
       {/* Header */}
       <div className="px-5 pt-10 pb-6 max-w-lg mx-auto">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-slate-500 text-sm capitalize">{dateLabel}</p>
-            <h1 className="text-2xl font-bold mt-0.5 tracking-tight">Hoy</h1>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/history" className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors text-lg">📊</Link>
-            <Link href="/config" className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors text-lg">⚙️</Link>
-          </div>
+        <div>
+          <p className="text-slate-500 text-sm capitalize">{dateLabel}</p>
+          <h1 className="text-2xl font-bold mt-0.5 tracking-tight">Hoy</h1>
         </div>
 
         {/* Daily progress bar */}
