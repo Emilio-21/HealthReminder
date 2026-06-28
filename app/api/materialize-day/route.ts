@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+// Convert a wall-clock date+time in the given IANA timezone to the correct UTC instant.
+// `timeStr` may be "HH:MM" or "HH:MM:SS" (Postgres `time` columns include seconds).
+function zonedToUtc(dateStr: string, timeStr: string, tz: string): Date {
+  const time = timeStr.length === 5 ? `${timeStr}:00` : timeStr // normalize to HH:MM:SS
+  // Treat the wall clock as if it were UTC, then correct by the zone's offset.
+  // Compute the offset by formatting the same instant in UTC and in tz; the
+  // server's own timezone cancels out, so this works regardless of where it runs.
+  const naiveUtc = new Date(`${dateStr}T${time}Z`)
+  const asUtc = new Date(naiveUtc.toLocaleString('en-US', { timeZone: 'UTC' }))
+  const asTz = new Date(naiveUtc.toLocaleString('en-US', { timeZone: tz }))
+  const offset = asUtc.getTime() - asTz.getTime()
+  return new Date(naiveUtc.getTime() + offset)
+}
+
 export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization') ?? ''
   if (auth !== `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`) {
@@ -35,19 +49,14 @@ export async function POST(req: NextRequest) {
 
     if (s.mode === 'fixed' && s.fixed_times) {
       for (const t of s.fixed_times) {
-        const iso = `${dateStr}T${t}:00`
-        const utc = new Date(new Date(iso).toLocaleString('en-US', { timeZone: tz }))
-        // Convert local time to UTC
-        const localDate = new Date(iso)
-        const diff = localDate.getTime() - utc.getTime() + localDate.getTime()
-        const scheduled = new Date(localDate.getTime() - (utc.getTime() - localDate.getTime()))
-        toInsert.push({ habit_id: habit.id, scheduled_for: localDate.toISOString(), status: 'pending' })
+        const scheduled = zonedToUtc(dateStr, t, tz)
+        toInsert.push({ habit_id: habit.id, scheduled_for: scheduled.toISOString(), status: 'pending' })
       }
     }
 
     if (s.mode === 'interval' && s.interval_min && s.window_start && s.window_end) {
-      const start = new Date(`${dateStr}T${s.window_start}:00`)
-      const end = new Date(`${dateStr}T${s.window_end}:00`)
+      const start = zonedToUtc(dateStr, s.window_start, tz)
+      const end = zonedToUtc(dateStr, s.window_end, tz)
       let cur = new Date(start)
       while (cur <= end) {
         toInsert.push({ habit_id: habit.id, scheduled_for: cur.toISOString(), status: 'pending' })

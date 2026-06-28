@@ -5,6 +5,17 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const db = createClient(SUPABASE_URL, SERVICE_ROLE)
 
+// Convert a wall-clock date+time in `tz` to the correct UTC instant.
+// `timeStr` may be "HH:MM" or "HH:MM:SS" (Postgres `time` columns include seconds).
+function zonedToUtc(dateStr: string, timeStr: string, tz: string): Date {
+  const time = timeStr.length === 5 ? `${timeStr}:00` : timeStr
+  const naiveUtc = new Date(`${dateStr}T${time}Z`)
+  const asUtc = new Date(naiveUtc.toLocaleString('en-US', { timeZone: 'UTC' }))
+  const asTz = new Date(naiveUtc.toLocaleString('en-US', { timeZone: tz }))
+  const offset = asUtc.getTime() - asTz.getTime()
+  return new Date(naiveUtc.getTime() + offset)
+}
+
 Deno.serve(async () => {
   const { data: cfg } = await db.from('config').select('timezone').eq('id', 1).single()
   const tz = cfg?.timezone ?? 'America/Mexico_City'
@@ -29,14 +40,14 @@ Deno.serve(async () => {
 
     if (s.mode === 'fixed' && s.fixed_times) {
       for (const t of s.fixed_times) {
-        const localDate = new Date(`${dateStr}T${t}:00`)
-        toInsert.push({ habit_id: habit.id, scheduled_for: localDate.toISOString(), status: 'pending' })
+        const scheduled = zonedToUtc(dateStr, t, tz)
+        toInsert.push({ habit_id: habit.id, scheduled_for: scheduled.toISOString(), status: 'pending' })
       }
     }
 
     if (s.mode === 'interval' && s.interval_min && s.window_start && s.window_end) {
-      const start = new Date(`${dateStr}T${s.window_start}:00`)
-      const end = new Date(`${dateStr}T${s.window_end}:00`)
+      const start = zonedToUtc(dateStr, s.window_start, tz)
+      const end = zonedToUtc(dateStr, s.window_end, tz)
       let cur = new Date(start)
       while (cur <= end) {
         toInsert.push({ habit_id: habit.id, scheduled_for: cur.toISOString(), status: 'pending' })
