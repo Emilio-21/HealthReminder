@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
+import Clock from './Clock'
 
 type Reminder = { id: string; scheduled_for: string; status: 'pending' | 'done' | 'missed' }
 
@@ -83,7 +84,7 @@ function ReminderPill({ r, accent }: { r: Reminder; accent: string }) {
 export default async function Home() {
   const habits = await getTodayData()
   const now = new Date()
-  const dateLabel = now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+  const dateLabel = now.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', weekday: 'long', day: 'numeric', month: 'long' })
   const allR = habits.flatMap(h => h.reminders)
   const done = allR.filter(r => r.status === 'done').length
   const total = allR.length
@@ -93,8 +94,13 @@ export default async function Home() {
     <main className="min-h-screen" style={{ background: '#070b13', color: '#f1f5f9' }}>
       <div className="px-5 pt-10 pb-4 max-w-lg mx-auto">
         {/* Header */}
-        <p style={{ font:'500 12px Geist,sans-serif', color:'#64748b', letterSpacing:'.1em', textTransform:'uppercase' }} className="capitalize">{dateLabel}</p>
-        <h1 style={{ font:'700 34px Geist,sans-serif', color:'#f1f5f9', marginTop:5, letterSpacing:'-.02em' }}>Hoy</h1>
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12 }}>
+          <div style={{ minWidth:0 }}>
+            <p style={{ font:'500 12px Geist,sans-serif', color:'#64748b', letterSpacing:'.1em', textTransform:'uppercase' }} className="capitalize">{dateLabel}</p>
+            <h1 style={{ font:'700 34px Geist,sans-serif', color:'#f1f5f9', marginTop:5, letterSpacing:'-.02em' }}>Hoy</h1>
+          </div>
+          <Clock />
+        </div>
 
         {/* Progress */}
         {total > 0 && (
