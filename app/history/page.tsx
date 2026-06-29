@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
+import { dayBounds, dateInTz, todayStr } from '@/lib/time'
 
 const PALETTE = [
   { accent: '#2dd4bf', glow: 'rgba(45,212,191,0.35)', chipBg: 'rgba(45,212,191,0.12)' },
@@ -14,12 +15,13 @@ async function getHistory() {
     .from('habits').select('id, name, emoji').eq('active', true).order('created_at')
   if (!habits) return []
 
-  const today = new Date(); today.setHours(23,59,59,999)
-  const from = new Date(today); from.setDate(from.getDate()-29); from.setHours(0,0,0,0)
+  // 30-day window ending today, in CDMX local days.
+  const { start: todayStart, end: today } = dayBounds()
+  const from = new Date(todayStart); from.setDate(from.getDate()-29)
 
   const dateList: string[] = []
   const cur = new Date(from)
-  while (cur <= today) { dateList.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1) }
+  while (cur <= today) { dateList.push(dateInTz(cur)); cur.setDate(cur.getDate()+1) }
 
   return Promise.all(habits.map(async (h, idx) => {
     const { data: reminders } = await supabaseAdmin
@@ -28,7 +30,7 @@ async function getHistory() {
 
     const byDate = new Map<string, string[]>()
     for (const r of reminders ?? []) {
-      const d = r.scheduled_for.slice(0,10)
+      const d = dateInTz(r.scheduled_for)
       if (!byDate.has(d)) byDate.set(d, [])
       byDate.get(d)!.push(r.status)
     }
@@ -49,12 +51,12 @@ async function getHistory() {
     const check = new Date(); check.setDate(check.getDate()-1)
     let streak = 0
     for (let i=0;i<60;i++) {
-      const d = check.toISOString().slice(0,10)
+      const d = dateInTz(check)
       const s = (byDate.get(d) ?? []).filter(x => x !== 'pending')
       if (!s.length || !s.every(x => x === 'done')) break
       streak++; check.setDate(check.getDate()-1)
     }
-    const todayS = (byDate.get(new Date().toISOString().slice(0,10)) ?? []).filter(x => x !== 'pending')
+    const todayS = (byDate.get(todayStr()) ?? []).filter(x => x !== 'pending')
     if (todayS.length && todayS.every(x => x === 'done')) streak++
 
     return { ...h, cells, compliance, streak, colorIdx: idx % PALETTE.length }

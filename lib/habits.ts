@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase'
+import { dayBounds, dateInTz, todayStr } from '@/lib/time'
 
 export type MarkDoneResult = {
   habit: { id: string; name: string; emoji: string }
@@ -6,9 +7,10 @@ export type MarkDoneResult = {
   streak: number
 }
 
-// Marks the most recent pending reminder for a habit (by qr_token) as done and
-// recomputes the current streak. Shared by /done/[token] (QR scan) and /api/scan
-// (Telegram Mini App scan). Returns null if the token doesn't match a habit.
+// Marks the reminder that's currently being nagged about (the oldest *due*
+// pending reminder for a habit, by qr_token) as done and recomputes the current
+// streak. Shared by /done/[token] (QR scan) and /api/scan (Telegram Mini App
+// scan). Returns null if the token doesn't match a habit.
 export async function markDone(token: string, source = 'qr'): Promise<MarkDoneResult | null> {
   const { data: habit } = await supabaseAdmin
     .from('habits')
@@ -19,19 +21,37 @@ export async function markDone(token: string, source = 'qr'): Promise<MarkDoneRe
   if (!habit) return null
 
   const now = new Date()
-  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0)
-  const endOfDay = new Date(now); endOfDay.setHours(23, 59, 59, 999)
+  const { start: startOfDay, end: endOfDay } = dayBounds()
 
-  const { data: reminder } = await supabaseAdmin
+  // Mark the reminder the escalate job is actually nagging about: the oldest
+  // pending one that's already due (scheduled_for <= now). Marking the *latest*
+  // (e.g. tonight's 11 PM slot) would leave the overdue one pending and the
+  // nags would never stop. If nothing is due yet (a proactive scan), fall back
+  // to the earliest pending reminder of the day.
+  let { data: reminder } = await supabaseAdmin
     .from('reminders')
     .select('id')
     .eq('habit_id', habit.id)
     .eq('status', 'pending')
     .gte('scheduled_for', startOfDay.toISOString())
-    .lte('scheduled_for', endOfDay.toISOString())
-    .order('scheduled_for', { ascending: false })
+    .lte('scheduled_for', now.toISOString())
+    .order('scheduled_for', { ascending: true })
     .limit(1)
-    .single()
+    .maybeSingle()
+
+  if (!reminder) {
+    const { data: upcoming } = await supabaseAdmin
+      .from('reminders')
+      .select('id')
+      .eq('habit_id', habit.id)
+      .eq('status', 'pending')
+      .gte('scheduled_for', startOfDay.toISOString())
+      .lte('scheduled_for', endOfDay.toISOString())
+      .order('scheduled_for', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    reminder = upcoming
+  }
 
   let marked = false
   if (reminder) {
@@ -53,16 +73,16 @@ export async function markDone(token: string, source = 'qr'): Promise<MarkDoneRe
 
   const byDate = new Map<string, string[]>()
   for (const r of past ?? []) {
-    const d = r.scheduled_for.slice(0, 10)
+    const d = dateInTz(r.scheduled_for)
     if (!byDate.has(d)) byDate.set(d, [])
     byDate.get(d)!.push(r.status)
   }
 
   // Include today's just-marked reminder
-  const todayStr = now.toISOString().slice(0, 10)
+  const today = todayStr()
   if (marked) {
-    if (!byDate.has(todayStr)) byDate.set(todayStr, [])
-    byDate.get(todayStr)!.push('done')
+    if (!byDate.has(today)) byDate.set(today, [])
+    byDate.get(today)!.push('done')
   }
 
   // Count today's pending reminders to decide if today counts for streak
@@ -84,7 +104,7 @@ export async function markDone(token: string, source = 'qr'): Promise<MarkDoneRe
     const check = new Date(startOfDay)
     check.setDate(check.getDate() - 1)
     for (let i = 0; i < 89; i++) {
-      const d = check.toISOString().slice(0, 10)
+      const d = dateInTz(check)
       const s = byDate.get(d)
       if (!s || !s.every(x => x === 'done')) break
       streak++
@@ -94,7 +114,7 @@ export async function markDone(token: string, source = 'qr'): Promise<MarkDoneRe
     const check = new Date(startOfDay)
     check.setDate(check.getDate() - 1)
     for (let i = 0; i < 90; i++) {
-      const d = check.toISOString().slice(0, 10)
+      const d = dateInTz(check)
       const s = byDate.get(d)
       if (!s || !s.every(x => x === 'done')) break
       streak++

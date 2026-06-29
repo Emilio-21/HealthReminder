@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
 import Clock from './Clock'
+import { dayBounds, dateInTz, TZ } from '@/lib/time'
 
 type Reminder = { id: string; scheduled_for: string; status: 'pending' | 'done' | 'missed' }
 
@@ -21,9 +22,7 @@ async function getTodayData(): Promise<HabitWithData[]> {
     .from('habits').select('id, name, emoji').eq('active', true).order('created_at')
   if (!habits) return []
 
-  const now = new Date()
-  const s = new Date(now); s.setHours(0,0,0,0)
-  const e = new Date(now); e.setHours(23,59,59,999)
+  const { start: s, end: e } = dayBounds()
 
   return Promise.all(habits.map(async (h, idx) => {
     const { data: reminders } = await supabaseAdmin
@@ -38,14 +37,14 @@ async function getTodayData(): Promise<HabitWithData[]> {
 
     const byDate = new Map<string, string[]>()
     for (const r of past ?? []) {
-      const d = r.scheduled_for.slice(0,10)
+      const d = dateInTz(r.scheduled_for)
       if (!byDate.has(d)) byDate.set(d, [])
       byDate.get(d)!.push(r.status)
     }
     let streak = 0
     const check = new Date(s); check.setDate(check.getDate()-1)
     for (let i=0;i<60;i++) {
-      const d = check.toISOString().slice(0,10)
+      const d = dateInTz(check)
       const st = byDate.get(d)
       if (!st || !st.every(x => x==='done')) break
       streak++; check.setDate(check.getDate()-1)
@@ -56,7 +55,7 @@ async function getTodayData(): Promise<HabitWithData[]> {
 }
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString('es-MX', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })
 }
 
 function ReminderPill({ r, accent }: { r: Reminder; accent: string }) {
@@ -84,7 +83,7 @@ function ReminderPill({ r, accent }: { r: Reminder; accent: string }) {
 export default async function Home() {
   const habits = await getTodayData()
   const now = new Date()
-  const dateLabel = now.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', weekday: 'long', day: 'numeric', month: 'long' })
+  const dateLabel = now.toLocaleDateString('es-MX', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' })
   const allR = habits.flatMap(h => h.reminders)
   const done = allR.filter(r => r.status === 'done').length
   const total = allR.length

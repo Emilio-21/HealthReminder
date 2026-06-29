@@ -1,19 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-// Convert a wall-clock date+time in the given IANA timezone to the correct UTC instant.
-// `timeStr` may be "HH:MM" or "HH:MM:SS" (Postgres `time` columns include seconds).
-function zonedToUtc(dateStr: string, timeStr: string, tz: string): Date {
-  const time = timeStr.length === 5 ? `${timeStr}:00` : timeStr // normalize to HH:MM:SS
-  // Treat the wall clock as if it were UTC, then correct by the zone's offset.
-  // Compute the offset by formatting the same instant in UTC and in tz; the
-  // server's own timezone cancels out, so this works regardless of where it runs.
-  const naiveUtc = new Date(`${dateStr}T${time}Z`)
-  const asUtc = new Date(naiveUtc.toLocaleString('en-US', { timeZone: 'UTC' }))
-  const asTz = new Date(naiveUtc.toLocaleString('en-US', { timeZone: tz }))
-  const offset = asUtc.getTime() - asTz.getTime()
-  return new Date(naiveUtc.getTime() + offset)
-}
+import { zonedToUtc, todayStr } from '@/lib/time'
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization') ?? ''
@@ -25,9 +12,10 @@ export async function POST(req: NextRequest) {
   const tz = cfg?.timezone ?? 'America/Mexico_City'
 
   // Today's date in the configured timezone
-  const nowLocal = new Date(new Date().toLocaleString('en-US', { timeZone: tz }))
-  const dayOfWeek = nowLocal.getDay() === 0 ? 7 : nowLocal.getDay() // 1=Mon...7=Sun
-  const dateStr = nowLocal.toISOString().slice(0, 10) // YYYY-MM-DD
+  const dateStr = todayStr(tz) // YYYY-MM-DD
+  // Weekday of that local date (parse as UTC midnight so getUTCDay is stable).
+  const utcDay = new Date(`${dateStr}T00:00:00Z`).getUTCDay()
+  const dayOfWeek = utcDay === 0 ? 7 : utcDay // 1=Mon...7=Sun
 
   const { data: schedules, error } = await supabaseAdmin
     .from('schedules')

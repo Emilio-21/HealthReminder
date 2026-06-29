@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { dateInTz, dayBounds } from '@/lib/time'
 
 export async function GET() {
   const { data: habits } = await supabaseAdmin
@@ -26,17 +27,16 @@ export async function GET() {
     // Streak: consecutive days where ALL reminders were done
     const byDate = new Map<string, string[]>()
     for (const r of reminders ?? []) {
-      const d = r.scheduled_for.slice(0, 10)
+      const d = dateInTz(r.scheduled_for)
       if (!byDate.has(d)) byDate.set(d, [])
       byDate.get(d)!.push(r.status)
     }
 
     let streak = 0
-    const checkDate = new Date()
-    checkDate.setHours(0, 0, 0, 0)
+    const checkDate = new Date(dayBounds().start)
 
     for (let i = 0; i < 90; i++) {
-      const d = checkDate.toISOString().slice(0, 10)
+      const d = dateInTz(checkDate)
       const statuses = byDate.get(d)
       if (!statuses) {
         // today with no terminal status yet — skip, don't break streak

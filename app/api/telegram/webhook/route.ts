@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendMessage } from '@/lib/telegram'
+import { dayBounds } from '@/lib/time'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -19,16 +20,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (text === '/hoy') {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    const { start, end } = dayBounds()
 
     const { data: reminders } = await supabaseAdmin
       .from('reminders')
       .select('status, habits(name, emoji)')
-      .gte('scheduled_for', today.toISOString())
-      .lt('scheduled_for', tomorrow.toISOString())
+      .gte('scheduled_for', start.toISOString())
+      .lte('scheduled_for', end.toISOString())
 
     if (!reminders || reminders.length === 0) {
       await sendMessage(chatId, '📋 No hay recordatorios registrados para hoy.')
