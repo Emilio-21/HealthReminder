@@ -2,6 +2,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
 import { dayBounds, dateInTz, todayStr } from '@/lib/time'
 
+// History reflects reminder state that changes daily; render at request time.
+export const dynamic = 'force-dynamic'
+
 const PALETTE = [
   { accent: '#2dd4bf', glow: 'rgba(45,212,191,0.35)', chipBg: 'rgba(45,212,191,0.12)' },
   { accent: '#fbbf24', glow: 'rgba(251,191,36,0.35)',  chipBg: 'rgba(251,191,36,0.12)' },

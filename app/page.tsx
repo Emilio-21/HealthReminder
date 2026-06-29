@@ -3,6 +3,10 @@ import Link from 'next/link'
 import Clock from './Clock'
 import { dayBounds, dateInTz, TZ } from '@/lib/time'
 
+// Reminder state changes throughout the day (scans, nags, manual edits), so the
+// page must reflect the DB on every request rather than being prerendered.
+export const dynamic = 'force-dynamic'
+
 type Reminder = { id: string; scheduled_for: string; status: 'pending' | 'done' | 'missed' }
 
 type HabitWithData = {
